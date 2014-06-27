@@ -3,6 +3,8 @@
 
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
+import time
+import traceback
 from crawler.repos import get_random_repos, process_repo
 
 ntot = 0
@@ -10,11 +12,12 @@ nreadme = 0
 nlicense = 0
 while True:
     # Get a list of random repos.
+    strt = time.time()
     try:
         repos = get_random_repos()
     except Exception as e:
         print("While getting repos, got exception: ")
-        print(e)
+        traceback.print_exc()
         continue
 
     # Loop over these repos and process each one.
@@ -24,7 +27,7 @@ while True:
             r.append(process_repo(repo))
         except Exception as e:
             print("While analyzing a repo, got exception: ")
-            print(e)
+            traceback.print_exc()
             continue
 
     # Count the number of readmes and licenses.
@@ -34,5 +37,6 @@ while True:
     ntot += len(repos)
 
     # Watch the grass grow.
-    print("Analyzed {0} repositories. Found: {1} readmes, {2} licenses"
-          .format(ntot, nreadme, nlicense))
+    print(("Analyzed {0} repositories. Found: {1} readmes, {2} licenses. "
+           "Took {0} seconds.").format(ntot, nreadme, nlicense,
+                                       time.time() - strt))
