@@ -11,6 +11,7 @@ import json
 import base64
 import random
 import logging
+import requests
 
 from .gh import gh_request
 
@@ -49,30 +50,47 @@ def process_repo(repo, clobber=False):
     # Skip if this repo had already been downloaded.
     bp = os.path.join(BASE_DIR, name)
     if not clobber and os.path.exists(bp):
-        logging.warn("{0} has already been downloaded. Skipping".format(name))
-        return
+        logging.info("{0} has already been downloaded. Skipping".format(name))
+        return True, True
     elif not clobber:
         os.makedirs(bp)
 
-    # Save the info.
+    logging.info("Processing {0}...".format(name))
+
+    # Get the repository info.
+    try:
+        r = gh_request("/repos/{0}".format(name)).json()
+    except requests.exceptions.HTTPError:
+        logging.info("Can't get info for {0}".format(name))
+        return
     with open(os.path.join(bp, "info.json"), "w") as f:
-        json.dump(repo, f)
+        json.dump(r, f)
 
     # Get the README.
-    r = gh_request("/repos/{0}/readme".format(name)).json()
-    content = r.get("content", None)
-    if content is not None:
-        readme = base64.b64decode(content)
-        with open(os.path.join(bp, "README"), "w") as f:
-            f.write(readme)
+    readme = None
+    try:
+        r = gh_request("/repos/{0}/readme".format(name)).json()
+    except requests.exceptions.HTTPError:
+        logging.info("No README found for {0}".format(name))
     else:
-        logging.warn("No README found for {0}".format(name))
+        content = r.get("content", None)
+        if content is not None:
+            readme = base64.b64decode(content)
+            with open(os.path.join(bp, "README"), "w") as f:
+                f.write(readme)
+        else:
+            logging.info("No README found for {0}".format(name))
 
     # List the top-level directory.
-    r = gh_request("/repos/{0}/contents/".format(name)).json()
+    try:
+        r = gh_request("/repos/{0}/contents/".format(name)).json()
+    except requests.exceptions.HTTPError:
+        logging.info("Can't list top level directory for {0}".format(name))
+        return readme is not None, False
 
     # Try to find a license.
     files = []
+    lic_files = []
     for f in r:
         # Skip directories.
         if f["type"] != "file":
@@ -80,22 +98,30 @@ def process_repo(repo, clobber=False):
 
         # Score the licenseness of each file based on its filename.
         fn = f["name"]
+        files.append(fn)
         score = license_filename_score(fn)
         if score > 0:
-            files.append((fn, score))
+            lic_files.append((fn, score))
+
+    # Save the directory listing.
+    with open(os.path.join(bp, "files"), "w") as f:
+        f.write("\n".join(files))
 
     # Stop if no license file was found.
-    if not len(files):
-        logging.warning("No license found for {0}".format(name))
-        return
+    if not len(lic_files):
+        logging.info("No license found for {0}".format(name))
+        return readme is not None, False
 
     # Download and save the best license file.
-    fn = sorted(files, key=lambda o: o[1], reverse=True)[0][0]
+    fn = sorted(lic_files, key=lambda o: o[1], reverse=True)[0][0]
     r = gh_request("/repos/{0}/contents/{1}".format(name, fn)).json()
     content = r.get("content", None)
     if content is not None:
         license = base64.b64decode(content)
         with open(os.path.join(bp, "LICENSE"), "w") as f:
             f.write(license)
+        return readme is not None, True
     else:
-        logging.warn("Couldn't parse the license for {0}".format(name))
+        logging.info("Couldn't parse the license for {0}".format(name))
+
+    return readme is not None, False

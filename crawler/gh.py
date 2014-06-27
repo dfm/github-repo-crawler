@@ -7,6 +7,7 @@ from __future__ import (division, print_function, absolute_import,
 __all__ = ["get_auth", "gh_request"]
 
 import os
+import time
 import requests
 
 auth_id = None
@@ -24,16 +25,27 @@ def get_auth():
 
 
 def gh_request(endpoint, method="GET", **kwargs):
-    kwargs = dict(get_auth(), **kwargs)
+    payload = dict(get_auth(), **kwargs)
     headers = {
         "Accept": "application/vnd.github.v3+json",
         "User-Agent": "dfm/github-repo-crawler",
     }
     r = getattr(requests, method.lower())(base_url + endpoint,
-                                          params=kwargs,
+                                          params=payload,
                                           headers=headers)
 
     if r.status_code != requests.codes.ok:
+        if r.status_code == 403:
+            # This probably means that the rate limit was reached.
+            # Wait for rate limit to reset and then re-submit the request.
+            remain = int(r.headers["X-RateLimit-Remaining"])
+            if remain < 1:
+                reset = int(r.headers["X-RateLimit-Reset"]) - time.time()
+                print("Waiting {0} seconds for rate limit to reset..."
+                      .format(reset))
+                time.sleep(reset)
+                return gh_request(endpoint, method=method, **kwargs)
+
         r.raise_for_status()
 
     return r
