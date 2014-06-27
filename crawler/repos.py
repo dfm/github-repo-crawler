@@ -57,20 +57,23 @@ def process_repo(repo, clobber=False):
     if not clobber and os.path.exists(bp):
         logging.info("{0} has already been downloaded. Skipping".format(name))
         return False, False, False
-    elif not clobber:
-        os.makedirs(bp)
 
     logging.info("Processing {0}...".format(name))
 
     # Get the repository info.
     try:
-        r = gh_request("/repos/{0}".format(name)).json()
+        info = gh_request("/repos/{0}".format(name)).json()
     except requests.exceptions.HTTPError:
         logging.info("Can't get info for {0}".format(name))
         return False, False, False
 
+    # Save the information.
+    try:
+        os.makedirs(bp)
+    except os.error:
+        pass
     with open(os.path.join(bp, "info.json"), "w") as f:
-        json.dump(r, f)
+        json.dump(info, f)
 
     # Get the README.
     readme = None
@@ -88,11 +91,7 @@ def process_repo(repo, clobber=False):
             logging.info("No README found for {0}".format(name))
 
     # List the top-level directory.
-    try:
-        r = gh_request("/repos/{0}/contents/".format(name)).json()
-    except requests.exceptions.HTTPError:
-        logging.info("Can't list top level directory for {0}".format(name))
-        return False, False, False
+    r = gh_request("/repos/{0}/contents/".format(name)).json()
 
     # Try to find a license.
     files = []
