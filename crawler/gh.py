@@ -43,7 +43,7 @@ def gh_request(endpoint, method="GET", **kwargs):
                 reset = int(r.headers["X-RateLimit-Reset"]) - time.time()
                 print("Waiting {0} seconds for rate limit to reset..."
                       .format(reset))
-                time.sleep(reset)
+                time.sleep(max(1.0, reset))
                 return gh_request(endpoint, method=method, **kwargs)
 
         r.raise_for_status()

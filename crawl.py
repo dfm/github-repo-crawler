@@ -3,13 +3,22 @@
 
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
+import os
 import time
+import json
 import traceback
 from crawler.repos import get_random_repos, process_repo
 
-ntot = 0
-nreadme = 0
-nlicense = 0
+info_fn = "data/_STATS.json"
+if os.path.exists(info_fn):
+    with open(info_fn, "r") as f:
+        info = json.load(f)
+else:
+    info = {}
+    info["ntot"] = 0
+    info["nreadme"] = 0
+    info["nlicense"] = 0
+
 while True:
     # Get a list of random repos.
     strt = time.time()
@@ -32,11 +41,13 @@ while True:
 
     # Count the number of readmes and licenses.
     r = map(sum, zip(*r))
-    nreadme += r[0]
-    nlicense += r[1]
-    ntot += len(repos)
+    info["ntot"] += r[0]
+    info["nreadme"] += r[1]
+    info["nlicense"] += r[2]
 
     # Watch the grass grow.
     print(("Analyzed {0} repositories. Found: {1} readmes, {2} licenses. "
-           "Took {0} seconds.").format(ntot, nreadme, nlicense,
-                                       time.time() - strt))
+           "Took {3} seconds.").format(info["ntot"], info["nreadme"],
+                                       info["nlicense"], time.time() - strt))
+    with open(info_fn, "w") as f:
+        json.dump(info, f)

@@ -45,13 +45,18 @@ def license_filename_score(fn):
 
 
 def process_repo(repo, clobber=False):
+    # Skip forks.
+    if repo.get("fork", True):
+        return False, False, False
+
+    # Get the repository name.
     name = repo["full_name"]
 
     # Skip if this repo had already been downloaded.
     bp = os.path.join(BASE_DIR, name)
     if not clobber and os.path.exists(bp):
         logging.info("{0} has already been downloaded. Skipping".format(name))
-        return True, True
+        return False, False, False
     elif not clobber:
         os.makedirs(bp)
 
@@ -62,7 +67,8 @@ def process_repo(repo, clobber=False):
         r = gh_request("/repos/{0}".format(name)).json()
     except requests.exceptions.HTTPError:
         logging.info("Can't get info for {0}".format(name))
-        return
+        return False, False, False
+
     with open(os.path.join(bp, "info.json"), "w") as f:
         json.dump(r, f)
 
@@ -86,7 +92,7 @@ def process_repo(repo, clobber=False):
         r = gh_request("/repos/{0}/contents/".format(name)).json()
     except requests.exceptions.HTTPError:
         logging.info("Can't list top level directory for {0}".format(name))
-        return readme is not None, False
+        return False, False, False
 
     # Try to find a license.
     files = []
@@ -105,12 +111,12 @@ def process_repo(repo, clobber=False):
 
     # Save the directory listing.
     with open(os.path.join(bp, "files"), "w") as f:
-        f.write("\n".join(files))
+        f.write(("\n".join(files)).encode("utf-8"))
 
     # Stop if no license file was found.
     if not len(lic_files):
         logging.info("No license found for {0}".format(name))
-        return readme is not None, False
+        return True, readme is not None, False
 
     # Download and save the best license file.
     fn = sorted(lic_files, key=lambda o: o[1], reverse=True)[0][0]
@@ -120,8 +126,8 @@ def process_repo(repo, clobber=False):
         license = base64.b64decode(content)
         with open(os.path.join(bp, "LICENSE"), "w") as f:
             f.write(license)
-        return readme is not None, True
+        return True, readme is not None, True
     else:
         logging.info("Couldn't parse the license for {0}".format(name))
 
-    return readme is not None, False
+    return True, readme is not None, False
