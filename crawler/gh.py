@@ -24,15 +24,21 @@ def get_auth():
     return {"client_id": auth_id, "client_secret": auth_secret}
 
 
-def gh_request(endpoint, method="GET", **kwargs):
+def gh_request(endpoint, method="GET", retries=0, **kwargs):
     payload = dict(get_auth(), **kwargs)
     headers = {
         "Accept": "application/vnd.github.v3+json",
         "User-Agent": "dfm/github-repo-crawler",
     }
-    r = getattr(requests, method.lower())(base_url + endpoint,
-                                          params=payload,
-                                          headers=headers)
+    try:
+        r = getattr(requests, method.lower())(base_url + endpoint,
+                                              params=payload,
+                                              headers=headers)
+    except requests.exceptions.ConnectionError:
+        if retries < 10:
+            print("Retrying {0}".format(endpoint))
+            return gh_request(endpoint, method=method, retries=retries+1,
+                              **kwargs)
 
     if r.status_code != requests.codes.ok:
         if r.status_code == 403:

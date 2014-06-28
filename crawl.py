@@ -35,7 +35,8 @@ while True:
         try:
             r.append(process_repo(repo))
         except Exception as e:
-            print("While analyzing a repo, got exception: ")
+            print("While analyzing a repo {0}, got exception: "
+                  .format(repo["full_name"]))
             traceback.print_exc()
             continue
 
