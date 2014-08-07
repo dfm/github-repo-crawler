@@ -91,7 +91,11 @@ def process_repo(repo, clobber=False):
             logging.info("No README found for {0}".format(name))
 
     # List the top-level directory.
-    r = gh_request("/repos/{0}/contents/".format(name)).json()
+    try:
+        r = gh_request("/repos/{0}/contents/".format(name)).json()
+    except requests.exceptions.HTTPError:
+        logging.info("Empty repo {0}".format(name))
+        return True, False, False
 
     # Try to find a license.
     files = []
