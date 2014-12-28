@@ -1,3 +1,11 @@
 local.sh
 data
 *.pyc
+results
+.ipynb_checkpoints
+*.db
+*.gz
+*.png
+*.txt
+*.json
+*.db-journal
